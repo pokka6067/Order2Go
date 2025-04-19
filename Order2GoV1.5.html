@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimal-ui">
+  <title>Food Order App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.1/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-100 p-4">
+
+<div class="max-w-3xl mx-auto bg-white p-6 rounded-xl shadow-md">
+  <h1 class="text-3xl font-bold mb-6">Food Order System</h1>
+
+  <!-- Add Menu Item -->
+  <h2 class="text-xl font-semibold mt-6">Add Menu Item</h2>
+  <div class="flex gap-2 mt-2 mb-4">
+    <input type="text" id="newItemName" placeholder="Item name" class="border p-2 rounded flex-1">
+    <input type="number" id="newItemPrice" placeholder="Price" class="border p-2 rounded w-32">
+    <button class="bg-green-500 text-white px-4 py-2 rounded" onclick="addMenuItem()">Add Menu</button>
+  </div>
+  <div id="menuList"></div>
+
+  <!-- Add Side Dish -->
+  <h2 class="text-xl font-semibold mt-6">Add Side Dish</h2>
+  <div class="flex gap-2 mt-2 mb-4">
+    <input type="text" id="newSideName" placeholder="Side name" class="border p-2 rounded flex-1">
+    <input type="number" id="newSidePrice" placeholder="Price" class="border p-2 rounded w-32">
+    <button class="bg-green-500 text-white px-4 py-2 rounded" onclick="addSideDish()">Add Side</button>
+  </div>
+  <div id="sideList"></div>
+
+  <!-- Add Beverage -->
+  <h2 class="text-xl font-semibold mt-6">Add Beverage</h2>
+  <div class="flex gap-2 mt-2 mb-4">
+    <input type="text" id="newBeverageName" placeholder="Beverage name" class="border p-2 rounded flex-1">
+    <input type="number" id="newBeveragePrice" placeholder="Price" class="border p-2 rounded w-32">
+    <button class="bg-green-500 text-white px-4 py-2 rounded" onclick="addBeverage()">Add Beverage</button>
+  </div>
+  <div id="beverageList"></div>
+
+  <!-- Order Summary -->
+  <h2 class="text-xl font-semibold mt-6">Order Summary</h2>
+  <div id="orderSummaryTable" class="overflow-x-auto"></div>
+
+  <!-- Sale & Today Sale -->
+  <div class="flex gap-4 mt-4">
+    <button class="bg-blue-500 text-white px-4 py-2 rounded" onclick="exportToExcel()">Export to Excel</button>
+    <button class="bg-yellow-500 text-white px-4 py-2 rounded" onclick="clearOrders()">Clear Orders</button>
+    <button class="bg-green-500 text-white px-4 py-2 rounded" onclick="recordSale()">Sale</button>
+  </div>
+
+  <h2 class="text-xl font-semibold mt-6">Today's Sales: $<span id="todaySale">0.00</span></h2>
+
+  <div class="mt-4">
+    <h3 class="text-lg font-semibold">Category Totals</h3>
+    <div id="categoryTotals">
+      <p class="mb-2">Menu Total: $<span id="menuTotal">0.00</span></p>
+      <p class="mb-2">Side Dish Total: $<span id="sideDishTotal">0.00</span></p>
+      <p class="mb-2">Beverage Total: $<span id="beverageTotal">0.00</span></p>
+    </div>
+    <button class="bg-red-500 text-white px-4 py-2 rounded mt-2" onclick="clearSales()">Clear Today's Sales</button>
+  </div>
+</div>
+
+<script>
+  function loadData(key) {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : null;
+  }
+
+  function saveData(key, data) {
+    localStorage.setItem(key, JSON.stringify(data));
+  }
+
+  let menu = loadData("menu") || [];
+  let sides = loadData("sides") || [];
+  let beverages = loadData("beverages") || [];
+  let orders = loadData("orders") || [];
+  let todaySales = loadData("todaySales") || 0;
+  let menuTotal = loadData("menuTotal") || 0;
+  let sideDishTotal = loadData("sideDishTotal") || 0;
+  let beverageTotal = loadData("beverageTotal") || 0;
+
+  const menuListEl = document.getElementById('menuList');
+  const sideListEl = document.getElementById('sideList');
+  const beverageListEl = document.getElementById('beverageList');
+  const orderSummaryTableEl = document.getElementById('orderSummaryTable');
+  const todaySaleEl = document.getElementById('todaySale');
+  const menuTotalEl = document.getElementById('menuTotal');
+  const sideDishTotalEl = document.getElementById('sideDishTotal');
+  const beverageTotalEl = document.getElementById('beverageTotal');
+
+  function renderMenu() {
+    menuListEl.innerHTML = "<h3 class='text-lg font-medium mb-2'>Menus:</h3>";
+    menu.forEach((item, i) => {
+      const el = document.createElement("div");
+      el.className = "flex justify-between items-center mb-2 p-2 border rounded";
+      el.innerHTML = `
+        <div>${item.name} ($${item.price})</div>
+        <div class="flex gap-2">
+          <input type="number" id="menuQty${i}" value="1" min="1" class="border p-1 rounded w-16" />
+          <button class="bg-blue-500 text-white px-3 py-1 rounded" onclick="addItemToOrder('menu', ${i})">Add to Order</button>
+          <button class="bg-red-500 text-white px-3 py-1 rounded" onclick="deleteMenuItem(${i})">Delete</button>
+        </div>
+      `;
+      menuListEl.appendChild(el);
+    });
+  }
+
+  function renderSides() {
+    sideListEl.innerHTML = "<h3 class='text-lg font-medium mb-2'>Side Dishes:</h3>";
+    sides.forEach((side, i) => {
+      const el = document.createElement("div");
+      el.className = "flex justify-between items-center mb-2 p-2 border rounded";
+      el.innerHTML = `
+        <div>${side.name} ($${side.price})</div>
+        <div class="flex gap-2">
+          <input type="number" id="sideQty${i}" value="1" min="1" class="border p-1 rounded w-16" />
+          <button class="bg-blue-500 text-white px-3 py-1 rounded" onclick="addItemToOrder('side', ${i})">Add to Order</button>
+          <button class="bg-red-500 text-white px-3 py-1 rounded" onclick="deleteSideDish(${i})">Delete</button>
+        </div>
+      `;
+      sideListEl.appendChild(el);
+    });
+  }
+
+  function renderBeverages() {
+    beverageListEl.innerHTML = "<h3 class='text-lg font-medium mb-2'>Beverages:</h3>";
+    beverages.forEach((bev, i) => {
+      const el = document.createElement("div");
+      el.className = "flex justify-between items-center mb-2 p-2 border rounded";
+      el.innerHTML = `
+        <div>${bev.name} ($${bev.price})</div>
+        <div class="flex gap-2">
+          <input type="number" id="beverageQty${i}" value="1" min="1" class="border p-1 rounded w-16" />
+          <button class="bg-blue-500 text-white px-3 py-1 rounded" onclick="addItemToOrder('beverage', ${i})">Add to Order</button>
+          <button class="bg-red-500 text-white px-3 py-1 rounded" onclick="deleteBeverage(${i})">Delete</button>
+        </div>
+      `;
+      beverageListEl.appendChild(el);
+    });
+  }
+
+  function addMenuItem() {
+    const name = document.getElementById("newItemName").value.trim();
+    const price = parseFloat(document.getElementById("newItemPrice").value);
+    if (name && !isNaN(price)) {
+      menu.push({ name, price });
+      saveData("menu", menu);
+      renderMenu();
+      document.getElementById("newItemName").value = "";
+      document.getElementById("newItemPrice").value = "";
+    }
+  }
+
+  function addSideDish() {
+    const name = document.getElementById("newSideName").value.trim();
+    const price = parseFloat(document.getElementById("newSidePrice").value);
+    if (name && !isNaN(price)) {
+      sides.push({ name, price });
+      saveData("sides", sides);
+      renderSides();
+      document.getElementById("newSideName").value = "";
+      document.getElementById("newSidePrice").value = "";
+    }
+  }
+
+  function addBeverage() {
+    const name = document.getElementById("newBeverageName").value.trim();
+    const price = parseFloat(document.getElementById("newBeveragePrice").value);
+    if (name && !isNaN(price)) {
+      beverages.push({ name, price });
+      saveData("beverages", beverages);
+      renderBeverages();
+      document.getElementById("newBeverageName").value = "";
+      document.getElementById("newBeveragePrice").value = "";
+    }
+  }
+
+  function deleteMenuItem(index) {
+    if (confirm(`Delete ${menu[index].name}?`)) {
+      menu.splice(index, 1);
+      saveData("menu", menu);
+      renderMenu();
+    }
+  }
+
+  function deleteSideDish(index) {
+    if (confirm(`Delete ${sides[index].name}?`)) {
+      sides.splice(index, 1);
+      saveData("sides", sides);
+      renderSides();
+    }
+  }
+
+  function deleteBeverage(index) {
+    if (confirm(`Delete ${beverages[index].name}?`)) {
+      beverages.splice(index, 1);
+      saveData("beverages", beverages);
+      renderBeverages();
+    }
+  }
+
+  function addItemToOrder(type, index) {
+    const list = type === 'menu' ? menu : type === 'side' ? sides : beverages;
+    const qty = parseInt(document.getElementById(`${type}Qty${index}`).value) || 1;
+    const item = list[index];
+    const timestamp = new Date().toISOString().replace("T", " ").split(".")[0];
+
+    const existing = orders.find(o => o.name === item.name && o.type === type);
+    if (existing) {
+      existing.qty += qty;
+      existing.timestamp = timestamp;
+    } else {
+      orders.push({ name: item.name, price: item.price, qty, type, timestamp });
+    }
+    saveData("orders", orders);
+    renderOrderSummary();
+  }
+
+  function renderOrderSummary() {
+    let html = `
+      <table class="min-w-full table-auto mt-4 border-collapse">
+        <thead>
+          <tr>
+            <th class="px-4 py-2 border">Item</th>
+            <th class="px-4 py-2 border">Qty</th>
+            <th class="px-4 py-2 border">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    let grandTotal = 0;
+    orders.forEach(order => {
+      const total = order.qty * order.price;
+      grandTotal += total;
+      html += `
+        <tr>
+          <td class="px-4 py-2 border">${order.name}</td>
+          <td class="px-4 py-2 border">${order.qty}</td>
+          <td class="px-4 py-2 border">$${total.toFixed(2)}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+      </table>
+      <div class="mt-2 text-lg font-semibold flex justify-end">
+        <p>Grand Total: $${grandTotal.toFixed(2)}</p>
+      </div>
+    `;
+
+    orderSummaryTableEl.innerHTML = html;
+  }
+
+  function updateCategoryTotals() {
+    const loadedMenuTotal = loadData("menuTotal") || 0;
+    const loadedSideTotal = loadData("sideDishTotal") || 0;
+    const loadedBeverageTotal = loadData("beverageTotal") || 0;
+
+    menuTotal = orders.filter(o => o.type === 'menu').reduce((sum, o) => sum + o.qty * o.price, 0) + loadedMenuTotal;
+    sideDishTotal = orders.filter(o => o.type === 'side').reduce((sum, o) => sum + o.qty * o.price, 0) + loadedSideTotal;
+    beverageTotal = orders.filter(o => o.type === 'beverage').reduce((sum, o) => sum + o.qty * o.price, 0) + loadedBeverageTotal;
+  }
+
+  function recordSale() {
+    const grandTotal = orders.reduce((sum, o) => sum + o.qty * o.price, 0);
+    todaySales += grandTotal;
+    updateCategoryTotals();
+    saveData("todaySales", todaySales);
+    saveData("menuTotal", menuTotal);
+    saveData("sideDishTotal", sideDishTotal);
+    saveData("beverageTotal", beverageTotal);
+    orders = [];
+    saveData("orders", orders);
+    renderOrderSummary();
+    renderSalesDetails();
+  }
+
+  function renderSalesDetails() {
+    todaySaleEl.textContent = todaySales.toFixed(2);
+    menuTotalEl.textContent = menuTotal.toFixed(2);
+    sideDishTotalEl.textContent = sideDishTotal.toFixed(2);
+    beverageTotalEl.textContent = beverageTotal.toFixed(2);
+  }
+
+  function clearSales() {
+    todaySales = 0;
+    menuTotal = 0;
+    sideDishTotal = 0;
+    beverageTotal = 0;
+    saveData("todaySales", 0);
+    saveData("menuTotal", 0);
+    saveData("sideDishTotal", 0);
+    saveData("beverageTotal", 0);
+    renderSalesDetails();
+  }
+
+  function clearOrders() {
+    orders = [];
+    saveData("orders", orders);
+    renderOrderSummary();
+  }
+
+  function exportToExcel() {
+    const ws = XLSX.utils.json_to_sheet(orders);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Orders");
+    XLSX.writeFile(wb, "orders.xlsx");
+  }
+
+  // Initial Render
+  renderMenu();
+  renderSides();
+  renderBeverages();
+  renderOrderSummary();
+  renderSalesDetails();
+</script>
+
+</body>
+</html>
