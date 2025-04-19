@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimal-ui">
+  <title>Food Order App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.1/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-100 p-4">
+
+<div class="max-w-3xl mx-auto bg-white p-6 rounded-xl shadow-md">
+  <h1 class="text-3xl font-bold mb-6">Food Order System</h1>
+
+  <h2 class="text-xl font-semibold mt-6">Add Menu Item</h2>
+  <div class="flex gap-2 mt-2 mb-4">
+    <input type="text" id="newItemName" placeholder="Item name" class="border p-2 rounded flex-1">
+    <input type="number" id="newItemPrice" placeholder="Price" class="border p-2 rounded w-32">
+    <button class="bg-green-500 text-white px-4 py-2 rounded" onclick="addMenuItem()">Add Menu</button>
+  </div>
+  <div id="menuList"></div>
+
+  <h2 class="text-xl font-semibold mt-6">Add Side Dish</h2>
+  <div class="flex gap-2 mt-2 mb-4">
+    <input type="text" id="newSideName" placeholder="Side name" class="border p-2 rounded flex-1">
+    <input type="number" id="newSidePrice" placeholder="Price" class="border p-2 rounded w-32">
+    <button class="bg-green-500 text-white px-4 py-2 rounded" onclick="addSideDish()">Add Side</button>
+  </div>
+  <div id="sideList"></div>
+
+  <h2 class="text-xl font-semibold mt-6">Order Summary</h2>
+  <div id="orderSummaryTable" class="overflow-x-auto"></div>
+
+  <div class="flex gap-4 mt-4">
+    <button class="bg-blue-500 text-white px-4 py-2 rounded" onclick="exportToExcel()">Export to Excel</button>
+    <button class="bg-yellow-500 text-white px-4 py-2 rounded" onclick="clearOrders()">Clear Orders</button>
+  </div>
+</div>
+
+<script>
+  function loadData(key) {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : null;
+  }
+
+  function saveData(key, data) {
+    localStorage.setItem(key, JSON.stringify(data));
+  }
+
+  let menu = loadData("menu") || [
+    { name: "Pizza", price: 10 },
+    { name: "Burger", price: 5 }
+  ];
+
+  let sides = loadData("sides") || [
+    { name: "Fries", price: 2 },
+    { name: "Drink", price: 1 }
+  ];
+
+  let orders = loadData("orders") || [];
+
+  const menuListEl = document.getElementById('menuList');
+  const sideListEl = document.getElementById('sideList');
+  const orderSummaryTableEl = document.getElementById('orderSummaryTable');
+
+  function renderMenu() {
+    saveData("menu", menu);
+    menuListEl.innerHTML = "<h3 class='text-lg font-medium mb-2'>Menu Items:</h3>";
+    menu.forEach((item, i) => {
+      const el = document.createElement("div");
+      el.className = "flex justify-between items-center mb-2 p-2 border rounded";
+      el.innerHTML = `
+        <div>${item.name} ($${item.price})</div>
+        <div class="flex gap-2">
+          <input type="number" id="menuQty${i}" value="1" min="1" class="border p-1 rounded w-16" />
+          <button class="bg-blue-500 text-white px-3 py-1 rounded" onclick="addItemToOrder('menu', ${i})">Add to Order</button>
+          <button class="bg-red-500 text-white px-3 py-1 rounded" onclick="removeMenuItem(${i})">Delete</button>
+        </div>
+      `;
+      menuListEl.appendChild(el);
+    });
+  }
+
+  function renderSides() {
+    saveData("sides", sides);
+    sideListEl.innerHTML = "<h3 class='text-lg font-medium mb-2'>Side Dishes:</h3>";
+    sides.forEach((side, i) => {
+      const el = document.createElement("div");
+      el.className = "flex justify-between items-center mb-2 p-2 border rounded";
+      el.innerHTML = `
+        <div>${side.name} ($${side.price})</div>
+        <div class="flex gap-2">
+          <input type="number" id="sideQty${i}" value="1" min="1" class="border p-1 rounded w-16" />
+          <button class="bg-blue-500 text-white px-3 py-1 rounded" onclick="addItemToOrder('side', ${i})">Add to Order</button>
+          <button class="bg-red-500 text-white px-3 py-1 rounded" onclick="removeSideDish(${i})">Delete</button>
+        </div>
+      `;
+      sideListEl.appendChild(el);
+    });
+  }
+
+  function addMenuItem() {
+    const name = document.getElementById('newItemName').value.trim();
+    const price = parseFloat(document.getElementById('newItemPrice').value);
+    if (name && !isNaN(price)) {
+      menu.push({ name, price });
+      document.getElementById('newItemName').value = '';
+      document.getElementById('newItemPrice').value = '';
+      renderMenu();
+    }
+  }
+
+  function addSideDish() {
+    const name = document.getElementById('newSideName').value.trim();
+    const price = parseFloat(document.getElementById('newSidePrice').value);
+    if (name && !isNaN(price)) {
+      sides.push({ name, price });
+      document.getElementById('newSideName').value = '';
+      document.getElementById('newSidePrice').value = '';
+      renderSides();
+    }
+  }
+
+  function removeMenuItem(index) {
+    if (confirm("Are you sure you want to delete this menu item?")) {
+      menu.splice(index, 1);
+      renderMenu();
+    }
+  }
+
+  function removeSideDish(index) {
+    if (confirm("Are you sure you want to delete this side dish?")) {
+      sides.splice(index, 1);
+      renderSides();
+    }
+  }
+
+  function addItemToOrder(type, index) {
+    const item = type === 'menu' ? menu[index] : sides[index];
+    const quantity = parseInt(document.getElementById(`${type}Qty${index}`).value) || 1;
+    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
+
+    const existingOrder = orders.find(o => o.name === item.name);
+    if (existingOrder) {
+      existingOrder.qty += quantity;
+      existingOrder.timestamp = timestamp;
+    } else {
+      orders.push({ name: item.name, price: item.price, qty: quantity, timestamp });
+    }
+    saveData("orders", orders);
+    renderOrderSummary();
+  }
+
+  function renderOrderSummary() {
+    let html = `
+      <table class="min-w-full table-auto mt-4 border-collapse">
+        <thead>
+          <tr>
+            <th class="px-4 py-2 border">Item</th>
+            <th class="px-4 py-2 border">Quantity</th>
+            <th class="px-4 py-2 border">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    let grandTotal = 0;
+    orders.forEach(order => {
+      const total = order.qty * order.price;
+      grandTotal += total;
+      html += `
+        <tr>
+          <td class="px-4 py-2 border">${order.name}</td>
+          <td class="px-4 py-2 border">${order.qty}</td>
+          <td class="px-4 py-2 border">$${total.toFixed(2)}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" class="px-4 py-2 border text-right font-bold">Total:</td>
+            <td class="px-4 py-2 border font-bold">$${grandTotal.toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    `;
+
+    orderSummaryTableEl.innerHTML = html;
+  }
+
+  function exportToExcel() {
+    const data = [];
+    data.push(['Item', 'Quantity', 'Total', 'Timestamp']);
+
+    orders.forEach(order => {
+      data.push([order.name, order.qty, order.qty * order.price, order.timestamp]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Order Summary');
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+    const timestamp = new Date().toISOString().replace(/T/, '_').replace(/\..+/, '');
+    const filename = `order_summary_${timestamp}.xlsx`;
+
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+    saveAs(blob, filename);
+  }
+
+  function clearOrders() {
+    if (confirm("Clear all current orders?")) {
+      orders = [];
+      saveData("orders", orders);
+      renderOrderSummary();
+    }
+  }
+
+  renderMenu();
+  renderSides();
+  renderOrderSummary();
+</script>
+
+</body>
+</html>
